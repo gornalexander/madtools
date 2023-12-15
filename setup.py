@@ -113,7 +113,7 @@ setup(
     # the `py_modules` argument instead as follows, which will expect a file
     # called `my_module.py` to exist:
     #
-    #   py_modules=["my_module"],
+    py_modules=["madplotter", "madtracker"],
     #
     packages=find_packages(where="./"),  # Required
     # Specify which Python versions you support. In contrast to the
