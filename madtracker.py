@@ -88,7 +88,7 @@ def transfer_beam(
 
     if observe == 'all':
         observe = list(twiss.index)
-    else:
+    elif observe == 'last':
         observe = list(twiss.index)[-1]
         
     particles, losses = track_line_ptc(
