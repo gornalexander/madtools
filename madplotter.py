@@ -68,6 +68,8 @@ def plot_lattice(
     twiss['color'] = [colors[kwrd] if kwrd in colors.keys() else None for kwrd in twiss.keyword]
     to_draw = twiss[(twiss['color'] >= '') & (twiss['aper_1'] > 0)]
     vdims = [to_draw[item] for item in vdims_names]
+    # Apertures
+    to_draw.loc[to_draw['apertype'] == 'circle', 'aper_2'] = to_draw[to_draw['apertype'] == 'circle']['aper_1'] # add vertical apertures for circle apertype
 
     to_draw['right'] = to_draw['s']
     to_draw['s'] = to_draw['s'] - to_draw['l']
