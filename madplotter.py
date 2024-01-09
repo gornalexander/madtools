@@ -22,7 +22,8 @@ colors = {
     'kicker': 'orange',
     'marker': 'blue',
     'rfcavity': 'wheat',
-    'collimator': 'black'
+    'collimator': 'black',
+    'monitor': 'gray',
 }
 
 fontsize={
