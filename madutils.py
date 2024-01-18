@@ -8,17 +8,20 @@ def calc_corr_factor(x, y):
     k = cov[0,1] / cov[0,0]
     return k
 
+def get_cov_det_sqrt(x, y):
+    return np.sqrt(np.linalg.det(np.cov(x, y)))
+
 def calc_beam_pars(beam, gamma=400 / 0.938, center_beam=True):
     pars = {}
-    if center_beam:
-        beam = copy(beam) - beam.mean()
-    pars['sigma_x'] = np.sqrt((beam.x**2).mean())
-    pars['sigma_y'] = np.sqrt((beam.y**2).mean())
-    pars['sigma_xp'] = np.sqrt((beam.px**2).mean())
-    pars['sigma_yp'] = np.sqrt((beam.py**2).mean())
+    covxpx = np.cov(beam.x, beam.px)
+    covypy = np.cov(beam.y, beam.py)
+    pars['sigma_x'] = np.sqrt(covxpx[0,0])
+    pars['sigma_y'] = np.sqrt(covypy[0,0])
+    pars['sigma_xp'] = np.sqrt(covxpx[1,1])
+    pars['sigma_yp'] = np.sqrt(covypy[1,1])
     pars['dpp'] = np.sqrt((beam.pt**2).mean())
-    pars['geom_emitt_x'] = np.sqrt((beam.x**2).mean() * (beam.px**2).mean() - (beam.x*beam.px).mean()**2)
-    pars['geom_emitt_y'] = np.sqrt((beam.y**2).mean() * (beam.py**2).mean() - (beam.y*beam.py).mean()**2)
+    pars['geom_emitt_x'] = np.linalg.det(covxpx)**0.5
+    pars['geom_emitt_y'] = np.linalg.det(covypy)**0.5
     pars['emitt_norm_x'] = pars['geom_emitt_x'] * gamma
     pars['emitt_norm_y'] = pars['geom_emitt_y']  * gamma
     pars['beta_x'] = pars['sigma_x']**2 / pars['geom_emitt_x']
@@ -31,6 +34,10 @@ def calc_beam_pars(beam, gamma=400 / 0.938, center_beam=True):
     pars['dy'] = calc_corr_factor(beam.pt, beam.y)
     pars['dpx'] = calc_corr_factor(beam.pt, beam.px)
     pars['dpy'] = calc_corr_factor(beam.pt, beam.py)
+    pars['beta_geom_emitt_x'] = np.cov(beam.x - pars['dx'] * beam.x, beam.px - pars['dpx'] * beam.px)[0,0]**0.5
+    pars['beta_geom_emitt_y'] = np.cov(beam.y - pars['dy'] * beam.y, beam.py - pars['dpy'] * beam.py)[0,0]**0.5
+    pars['beta_emitt_norm_x'] = pars['geom_emitt_beta_x'] * gamma
+    pars['beta_emitt_norm_y'] = pars['geom_emitt_beta_y'] * gamma
     return pars
 
 def get_initial_condition(beam):
