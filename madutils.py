@@ -1,6 +1,10 @@
 from copy import copy
 import numpy as np
 import pandas as pd
+from scipy.constants import proton_mass, c, e
+
+
+proton_mass_GeV = proton_mass * c**2 / e * 1e-9
 
 
 def calc_corr_factor(x, y):
@@ -8,51 +12,79 @@ def calc_corr_factor(x, y):
     k = cov[0,1] / cov[0,0]
     return k
 
-def get_cov_det_sqrt(x, y):
-    return np.sqrt(np.linalg.det(np.cov(x, y)))
 
-def calc_beam_pars(beam, gamma=400 / 0.938, center_beam=True):
+def calc_beam_pars(beam, energy_GeV=400, mass_GeV=proton_mass_GeV):
     pars = {}
+    try:
+        gamma = beam.e.mean() / mass_GeV
+    except AttributeError:
+        gamma = energy_GeV / mass_GeV
     covxpx = np.cov(beam.x, beam.px)
     covypy = np.cov(beam.y, beam.py)
-    pars['sigma_x'] = np.sqrt(covxpx[0,0])
-    pars['sigma_y'] = np.sqrt(covypy[0,0])
-    pars['sigma_xp'] = np.sqrt(covxpx[1,1])
-    pars['sigma_yp'] = np.sqrt(covypy[1,1])
+    pars['rel_gamma'] = gamma
+    if 's' in beam.columns:
+        pars['s'] = beam.s.mean()
+    pars['sigx'] = np.sqrt(covxpx[0,0])
+    pars['sigy'] = np.sqrt(covypy[0,0])
+    pars['sigpx'] = np.sqrt(covxpx[1,1])
+    pars['sigpy'] = np.sqrt(covypy[1,1])
     pars['dpp'] = np.sqrt((beam.pt**2).mean())
     pars['geom_emitt_x'] = np.linalg.det(covxpx)**0.5
     pars['geom_emitt_y'] = np.linalg.det(covypy)**0.5
     pars['emitt_norm_x'] = pars['geom_emitt_x'] * gamma
     pars['emitt_norm_y'] = pars['geom_emitt_y']  * gamma
-    pars['beta_x'] = pars['sigma_x']**2 / pars['geom_emitt_x']
-    pars['beta_y'] = pars['sigma_y']**2 / pars['geom_emitt_y']
-    pars['alpha_x'] = - (beam.x*beam.px).mean() / pars['geom_emitt_x']
-    pars['alpha_y'] = - (beam.y*beam.py).mean() / pars['geom_emitt_y']
-    pars['gamma_x'] = pars['sigma_xp']**2 / pars['geom_emitt_x']
-    pars['gamma_y'] = pars['sigma_yp']**2 / pars['geom_emitt_y']
+    pars['betx'] = pars['sigx']**2 / pars['geom_emitt_x']
+    pars['bety'] = pars['sigy']**2 / pars['geom_emitt_y']
+    pars['alfx'] = - (beam.x*beam.px).mean() / pars['geom_emitt_x']
+    pars['alfy'] = - (beam.y*beam.py).mean() / pars['geom_emitt_y']
+    pars['gamx'] = pars['sigpx']**2 / pars['geom_emitt_x']
+    pars['gamy'] = pars['sigpy']**2 / pars['geom_emitt_y']
     pars['dx'] = calc_corr_factor(beam.pt, beam.x)
     pars['dy'] = calc_corr_factor(beam.pt, beam.y)
     pars['dpx'] = calc_corr_factor(beam.pt, beam.px)
     pars['dpy'] = calc_corr_factor(beam.pt, beam.py)
-    pars['beta_geom_emitt_x'] = np.cov(beam.x - pars['dx'] * beam.x, beam.px - pars['dpx'] * beam.px)[0,0]**0.5
-    pars['beta_geom_emitt_y'] = np.cov(beam.y - pars['dy'] * beam.y, beam.py - pars['dpy'] * beam.py)[0,0]**0.5
-    pars['beta_emitt_norm_x'] = pars['geom_emitt_beta_x'] * gamma
-    pars['beta_emitt_norm_y'] = pars['geom_emitt_beta_y'] * gamma
+    # pars['beta_geom_emitt_x'] = np.linalg.det(np.cov(beam.x - pars['dx'] * beam.pt, beam.px - pars['dpx'] * beam.pt))
+    # pars['beta_geom_emitt_y'] = np.linalg.det(np.cov(beam.y - pars['dy'] * beam.pt, beam.py - pars['dpy'] * beam.pt))
+    # pars['beta_emitt_norm_x'] = pars['beta_geom_emitt_x'] * gamma
+    # pars['beta_emitt_norm_y'] = pars['beta_geom_emitt_y'] * gamma
     return pars
+
+
+def remove_dispersion(beam):
+    beam = copy(beam)
+    beam.x -= calc_corr_factor(beam.pt, beam.x) * beam.pt
+    beam.y -= calc_corr_factor(beam.pt, beam.y) * beam.pt
+    beam.px -= calc_corr_factor(beam.pt, beam.px) * beam.pt
+    beam.py -= calc_corr_factor(beam.pt, beam.py) * beam.pt
+    return beam
+
+
+def get_twiss_from_distribution(particles, rm_dispersion=False):
+    locs = particles.index.drop_duplicates()
+    df_list = []
+    for i, loc in enumerate(locs):
+        beam = particles.loc[loc]
+        if rm_dispersion:
+            beam = remove_dispersion(beam)
+        pars = pd.DataFrame(calc_beam_pars(beam), index=[loc])
+        df_list.append(pars)
+    return pd.concat(df_list)
+
 
 def get_initial_condition(beam):
     beam_pars = calc_beam_pars(beam)
     initial_condition = dict(
-        betx = beam_pars['beta_x'],
-        alfx = beam_pars['alpha_x'],
-        bety = beam_pars['beta_y'],
-        alfy = beam_pars['alpha_y'],
+        betx = beam_pars['betx'],
+        alfx = beam_pars['alfx'],
+        bety = beam_pars['bety'],
+        alfy = beam_pars['alfy'],
         dx = calc_corr_factor(beam.pt, beam.x),
         dy = calc_corr_factor(beam.pt, beam.y),
         dpx = calc_corr_factor(beam.pt, beam.px),
         dpy = calc_corr_factor(beam.pt, beam.py)
     )
     return initial_condition
+
 
 def calc_envelope(particles):
     locs = particles.index.unique()
