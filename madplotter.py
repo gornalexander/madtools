@@ -250,3 +250,28 @@ def plot_all(twiss, env, range_=None, twiss_plots=None, offsets=None, **kwargs):
 
     return layout.cols(1)
 
+def plot_beam_within_aperture(
+        particles, 
+        twiss, 
+        loc, 
+        options=dict(width=400, height=400, tools=['hover'], size=0.5), 
+        frame_scale = 1.1):
+    beam = particles.loc[loc]
+    aper_1 = twiss.loc[loc].aper_1
+    aper_2 = twiss.loc[loc].aper_2
+    apertype = twiss.loc[loc].apertype
+    if apertype == 'circle':
+        aperture = hv.Ellipse(0, 0, aper_1*2, label=loc + 'aperture')
+        aper_2 = aper_1
+    elif apertype == 'ellipse':
+        aperture = hv.Ellipse(0, 0, (aper_1*2, aper_2*2), label=loc + 'aperture')
+    else:
+        raise ValueError('apertype not supported')
+    beam_and_aperture = hv.Scatter(beam, 'x', 'y', label='beam').opts(**options) * aperture
+    beam_and_aperture = beam_and_aperture.opts(
+        xlim=(-aper_1*frame_scale, aper_2*frame_scale),
+        ylim=(-aper_1*frame_scale, aper_2*frame_scale), 
+        fontsize=fontsize,
+        xlabel='x (m)', 
+        ylabel='y (m)')
+    return beam_and_aperture
