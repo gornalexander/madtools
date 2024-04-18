@@ -113,4 +113,4 @@ def calc_envelope(beam, groupby='index'):
     env['medy'] = gb.y.median()
     env['meanx'] = gb.x.mean()
     env['meany'] = gb.y.mean()
-    return pd.DataFrame(env)
+    return pd.DataFrame(env).sort_values('s')
