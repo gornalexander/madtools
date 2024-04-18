@@ -86,44 +86,31 @@ def get_initial_condition(beam):
     return initial_condition
 
 
-def calc_envelope(particles):
-    locs = particles.index.unique()
-    d = dict(
-        s = [],
-        minx = [],
-        miny = [],
-        maxx = [],
-        maxy = [],
-        xp0_5 = [],
-        yp0_5 = [],
-        xp99_5 = [],
-        yp99_5 = [],
-        xp5 = [],
-        yp5 = [],
-        xp95 = [],
-        yp95 = [],
-        medx = [],
-        medy = []
-    )
-    for i, bsg in enumerate(locs):
-        try:
-            d['s'].append(particles.loc[bsg]['s'][0])
-            distx = particles.loc[bsg]['x'] - 0*np.mean(particles.loc[bsg]['x'])
-            disty = particles.loc[bsg]['y'] - 0*np.mean(particles.loc[bsg]['y'])
-            d['minx'].append(np.min(distx))
-            d['miny'].append(np.min(disty))
-            d['maxx'].append(np.max(distx))
-            d['maxy'].append(np.max(disty))
-            d['xp0_5'].append(np.percentile(distx, 0.5))
-            d['yp0_5'].append(np.percentile(disty, 0.5))
-            d['xp99_5'].append(np.percentile(distx, 99.5))
-            d['yp99_5'].append(np.percentile(disty,99.5))
-            d['xp5'].append(np.percentile(distx, 5))
-            d['yp5'].append(np.percentile(disty, 5))
-            d['xp95'].append(np.percentile(distx, 95))
-            d['yp95'].append(np.percentile(disty, 95))
-            d['medx'].append(np.median(distx))
-            d['medy'].append(np.median(disty))
-        except:
-            pass
-    return pd.DataFrame(d)
+def calc_envelope(beam, groupby='index'):
+    if groupby == 'index':
+        beam.index.names = ['idx']
+        gb = beam.groupby('idx')
+    else:
+        gb = beam.groupby(groupby)
+
+    env = {}
+    env['s'] = gb.s.mean()
+    env['sx'] = gb.x.std()
+    env['sy'] = gb.y.std()
+    env['minx'] = gb.x.min()
+    env['miny'] = gb.y.min()
+    env['maxx'] = gb.x.max()
+    env['maxy'] = gb.y.max()
+    env['xp0_5'] = gb.x.quantile(0.5/100)
+    env['yp0_5'] = gb.y.quantile(0.5/100)
+    env['xp99_5'] = gb.x.quantile(99.5/100)
+    env['yp99_5'] = gb.y.quantile(99.5/100)
+    env['xp5'] = gb.x.quantile(5/100)
+    env['yp5'] = gb.y.quantile(5/100)
+    env['xp95'] = gb.x.quantile(95/100)
+    env['yp95'] = gb.y.quantile(95/100)
+    env['medx'] = gb.x.median()
+    env['medy'] = gb.y.median()
+    env['meanx'] = gb.x.mean()
+    env['meany'] = gb.y.mean()
+    return pd.DataFrame(env)
