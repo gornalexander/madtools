@@ -92,6 +92,8 @@ def plot_lattice(
             to_draw.loc[key, 'xbotto'] += offsets[key][0]
             to_draw.loc[key, 'ytopfrom'] += offsets[key][1]
             to_draw.loc[key, 'ybotto'] += offsets[key][1]
+            to_draw.loc[key, 'right'] += offsets[key][2]
+            to_draw.loc[key, 's'] += offsets[key][2]
     
     # Delete repeating keys from default_style
     style = copy(default_style)
