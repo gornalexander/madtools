@@ -156,6 +156,17 @@ def plot_envelope(env, range_=None, area_core_style=area_core_style, area_wings_
         env = copy(env[cond])
         env.s -= range_[0]
     
+    env['envx_up'] = env['sx'] + env['meanx']
+    env['envx_low'] = -env['sx'] + env['meanx']
+    env['envy_up'] = env['sy'] + env['meany']
+    env['envy_low'] = -env['sy'] + env['meany']
+    
+    sx_fill = hv.Area(env, s_dim, vdims=['envx_up', 'envx_low'], label='envelope-sigma')
+    sy_fill = hv.Area(env, s_dim, vdims=['envy_up', 'envy_low'], label='envelope-sigma')
+
+    sx = hv.Curve(env, s_dim, 'envx_up') * hv.Curve(env, s_dim, 'envx_low')
+    sy = hv.Curve(env, s_dim, 'envy_up') * hv.Curve(env, s_dim, 'envy_low')
+    
     xp90 = hv.Area(env, s_dim, vdims=['xp5', 'xp95'], label='envelope-p90')
     xp99 = hv.Area(env, s_dim, vdims=['xp0_5', 'xp99_5'], label='envelope-p99')
     yp90 = hv.Area(env, s_dim, vdims=['yp5', 'yp95'], label='envelope-p90')
@@ -169,12 +180,13 @@ def plot_envelope(env, range_=None, area_core_style=area_core_style, area_wings_
     curve_opts = opts.Curve(**curve_style)
     area_core_opts = opts.Area(**area_core_style)
     area_wings_opts = opts.Area(**area_wings_style)
+    area_sigma_opts = opts.Area(**area_sigma_style)
 
-    envelope_x = xp95 * xp995
-    envelope_y = yp95 * yp995
+    envelope_x = xp95 * xp995 * sx
+    envelope_y = yp95 * yp995 * sy
 
-    area_x = xp99.opts(area_wings_opts) * xp90.opts(area_core_opts)
-    area_y = yp99.opts(area_wings_opts) * yp90.opts(area_core_opts)
+    area_x = xp99.opts(area_wings_opts) * xp90.opts(area_core_opts) * sx_fill.opts(area_sigma_opts)
+    area_y = yp99.opts(area_wings_opts) * yp90.opts(area_core_opts) * sy_fill.opts(area_sigma_opts)
     envelope = (area_x * envelope_x + area_y * envelope_y).opts(curve_opts).cols(1)
     return envelope
 
