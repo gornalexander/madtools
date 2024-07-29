@@ -40,8 +40,8 @@ hover = HoverTool(tooltips=tooltips)
 s_dim = hv.Dimension('s', unit='m')
 
 default_style = dict(
-    width=1400, 
-    height=300, 
+    width=1000, 
+    height=250, 
     color='color', 
     line_color='black', 
     line_width=0.5, 
@@ -134,6 +134,11 @@ def plot_lattice(
 
 
 ################## Envelope ##################
+area_sigma_style = dict(
+    color = 'lightblue',
+    alpha = 1
+)
+
 area_core_style = dict(
     color = 'lightblue',
     alpha = 0.7
