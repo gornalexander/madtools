@@ -83,7 +83,7 @@ def transfer_beam(
     twiss = madx.twiss(**init_cond, rmatrix = True).dframe()
     
     if n_particles:
-        particles_distribution = particles_distribution.sample(n_particles)
+        particles_distribution = particles_distribution.sample(min(n_particles, len(particles_distribution.index)))
     particles_distribution["number"] = particles_distribution.index
 
     if observe == 'all':

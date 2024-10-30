@@ -23,6 +23,24 @@ colors = {
     'marker': 'blue',
     'rfcavity': 'wheat',
     'collimator': 'black',
+    'rcollimator': 'black',
+    'monitor': 'gray',
+}
+
+colors_tilted = {
+    'quadrupole': 'mediumseagreen',
+    'sextupole': 'blue',
+    'octupole': 'red',
+    'bend': 'indianred',
+    'rbend': 'indianred',
+    'lbend': 'indianred',
+    'hkicker': 'purple',
+    'vkicker': 'orange',
+    'kicker': 'orange',
+    'marker': 'blue',
+    'rfcavity': 'wheat',
+    'collimator': 'black',
+    'rcollimator': 'black',
     'monitor': 'gray',
 }
 
@@ -33,14 +51,14 @@ fontsize={
     'yticks': 10,
 }
 
-vdims_names = ['color', 'keyword', 'name', 's', 'apertype', 'aper_1', 'aper_2', 'l', 'k0l', 'k1l','betx', 'bety', 'alfx', 'alfy', 'mux', 'muy']
+vdims_names = ['color', 'keyword', 'name', 's', 'apertype', 'aper_1', 'aper_2', 'l', 'tilt', 'angle', 'k1l', 'betx', 'bety', 'alfx', 'alfy', 'mux', 'muy']
 tooltips = [(item, '@' + item) for item in vdims_names[1:]]
 hover = HoverTool(tooltips=tooltips)
 
 s_dim = hv.Dimension('s', unit='m')
 
 default_style = dict(
-    width=1000, 
+    width=800, 
     height=250, 
     color='color', 
     line_color='black', 
@@ -52,7 +70,7 @@ default_style = dict(
 def plot_lattice(
         twiss,
         range_=None,
-        vdims_names=vdims_names, elem_height=0.1,
+        vdims_names=vdims_names, elem_height=0.15,
         color=colors, show_markers=False,
         marker_width = 0.3, marker_height = 0.4,
         twiss_plots=None,
@@ -132,6 +150,93 @@ def plot_lattice(
     
     return lattice.opts(options).cols(1)
 
+SYNOPTIC_ELEM_HIGHT = 1
+SYNOPTIC_YLIM = (-SYNOPTIC_ELEM_HIGHT * 1.2, SYNOPTIC_ELEM_HIGHT * 3)
+SYNOPTIC_MARKER_WIDTH = 0.3
+SYNOPTIC_HOVER_NAMES = ['color', 'keyword', 'name', 's', 'apertype', 'aper_1', 'aper_2', 'l', 'tilt', 'angle', 'k1l']
+SYNOPTIC_TOOLTIPS = [(item, '@' + item) for item in SYNOPTIC_HOVER_NAMES[1:]]
+SYNOPTIC_STYLE = dict(
+    width=800, 
+    height=100, 
+    color='color', 
+    #alpha='alpha',
+    line_color='black', 
+    line_width=0.5, 
+    tools=[HoverTool(tooltips=SYNOPTIC_TOOLTIPS, anchor = 'center'), 'tap'],
+    fontsize=fontsize
+)
+
+def plot_synoptic(twiss, range_=None, 
+                  show_markers=False, 
+                  show_names=False,
+                  show_axes=False,
+                  **kwargs):
+    if range_:
+        range_ = range_.split('/')
+        twiss = copy(twiss.loc[range_[0]:range_[1]])
+        twiss.s -= twiss.loc[range_[0]].s
+    else:
+        twiss = copy(twiss)
+    
+    twiss['color'] = [colors[kwrd] if kwrd in colors.keys() else None for kwrd in twiss.keyword]
+    to_draw = twiss[twiss['color'] >= '']
+    to_draw['color'] = [colors_tilted[el.keyword] if el.tilt != 0 else colors[el.keyword] for idx, el in to_draw.iterrows()]
+
+    to_draw['right'] = to_draw['s']
+    to_draw['s'] = to_draw['s'] - to_draw['l']
+    to_draw['bottom'] = -SYNOPTIC_ELEM_HIGHT
+    to_draw['top'] = SYNOPTIC_ELEM_HIGHT
+    correct_bottom = np.where(to_draw['k1l'] > 0, SYNOPTIC_ELEM_HIGHT, 0)
+    correct_top = np.where(to_draw['k1l'] < 0, -SYNOPTIC_ELEM_HIGHT, 0)
+    to_draw['bottom'] += correct_bottom
+    to_draw['top'] += correct_top
+    to_draw['text'] = to_draw['name'].apply(lambda x: x.split('.')[0].upper())
+
+    synoptic = hv.HLine(0).opts(color='black', line_width=0.5, alpha=0.5)
+
+    # Delete repeating keys from default_style
+    style = copy(SYNOPTIC_STYLE)
+    for key in kwargs.keys():
+        style.pop(key, None)
+    # style['alpha'] = 'alpha'
+    options = opts.Rectangles(**style, **kwargs)
+
+    synoptic *= hv.Rectangles(to_draw, kdims=[s_dim, 'bottom', 'right', 'top'], vdims=SYNOPTIC_HOVER_NAMES)
+    
+    if show_markers:
+        markers = twiss[twiss.keyword == 'marker']
+        vdims_markers = [markers[item] for item in SYNOPTIC_HOVER_NAMES]
+        markers_drawn = hv.Rectangles((markers['s'] - SYNOPTIC_MARKER_WIDTH/2, 
+                             -SYNOPTIC_ELEM_HIGHT, 
+                             markers['s'] + SYNOPTIC_MARKER_WIDTH/2, 
+                             SYNOPTIC_ELEM_HIGHT,
+                               *vdims_markers                          
+                            ), vdims=SYNOPTIC_HOVER_NAMES)
+        
+        synoptic *= markers_drawn
+    if show_names:
+        for idx, el in to_draw.iterrows():
+            synoptic = synoptic * hv.Text(el.s + el.l/2, 
+                                          SYNOPTIC_ELEM_HIGHT * 1.2, 
+                                          el.text, 
+                                          halign='left', 
+                                          valign='center', 
+                                          rotation=60,
+                                          fontsize=6,
+                                          ).options(text_font_style='bold', text_color='grey')
+    if not show_axes:
+        def hide_hook(plot, element):
+            plot.handles["xaxis"].visible = False
+            plot.handles["yaxis"].visible = False 
+            # plot.handles["xgrid"].visible = False
+            # plot.handles["ygrid"].visible = False
+            #plot.handles["plot"].border_fill_color = None
+            #plot.handles["plot"].background_fill_color = None
+            plot.handles["plot"].outline_line_color = None
+        
+        synoptic = synoptic.opts(hooks=[hide_hook])
+
+    return synoptic.opts(ylim=SYNOPTIC_YLIM).opts(labelled=[]).opts(options)
 
 ################## Envelope ##################
 area_sigma_style = dict(
@@ -200,8 +305,8 @@ def plot_envelope(env, range_=None, area_core_style=area_core_style, area_wings_
 default_twiss_keys = ['betx', 'bety', 'alfx', 'alfy', 'mux', 'muy']
 
 twiss_style = dict(
-    width=1400, 
-    height=300,  
+    width=800, 
+    height=250,  
     tools=['hover', 'tap'],
     fontsize=fontsize
 )
@@ -248,7 +353,7 @@ def plot_twiss(twiss, kind='beta', range_=None, **kwargs):
     return layout.opts(**kwargs).cols(1)
 
 ################## All ##################
-def plot_all(twiss, env, range_=None, twiss_plots=None, offsets=None, **kwargs):
+def plot_all(twiss, env, range_=None, twiss_plots=None, offsets=None, synoptic=False, **kwargs):
     if range_:
         range_env=range_.split('/')
         s1 = twiss.loc[range_env[0]].s
@@ -261,9 +366,17 @@ def plot_all(twiss, env, range_=None, twiss_plots=None, offsets=None, **kwargs):
     x_opts = dict(xlabel='s (m)', ylabel='x (m)')
     y_opts = dict(xlabel='s (m)', ylabel='y (m)')
 
-    layout = (lattice[0] * envelope[0]).opts(**x_opts) + (lattice[1] * envelope[1]).opts(**y_opts)
+    if synoptic:
+        synoptic_kwargs = {} if not isinstance(synoptic, dict) else synoptic
+        synoptic = plot_synoptic(twiss, range_=range_, **synoptic_kwargs)
+        layout =\
+        synoptic +\
+        (lattice[0] * envelope[0]).opts(**x_opts) + (lattice[1] * envelope[1]).opts(**y_opts)
+    else:
+        layout=\
+        (lattice[0] * envelope[0]).opts(**x_opts) + (lattice[1] * envelope[1]).opts(**y_opts)
 
-    for i in range(len(lattice)):
+    for i in range(len(lattice)): # Add twiss plots to the layout
         if i > 1:
             layout += lattice[i]
 

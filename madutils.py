@@ -49,6 +49,20 @@ def calc_beam_pars(beam, energy_GeV=400, mass_GeV=proton_mass_GeV):
     # pars['beta_emitt_norm_y'] = pars['beta_geom_emitt_y'] * gamma
     return pars
 
+def calculate_scr(beam, betx_max, bety_max, sigma_factor=7, orbit_error_m=5e-3, size_error_rel=0.1, dispersion_error_rel=0.1, alignment_error_m=1e-3):
+    out = []
+    for loc, b in beam.groupby('idx'):
+        outi = {}
+        pars = calc_beam_pars(b)
+        outi['scr_x'] = pars['sigx'] * (sigma_factor + size_error_rel) + orbit_error_m * np.sqrt(pars['betx']/betx_max) + dispersion_error_rel * pars['dx'] * pars['dpp'] + alignment_error_m
+        outi['scr_y'] = pars['sigy'] * (sigma_factor + size_error_rel) + orbit_error_m * np.sqrt(pars['bety']/bety_max) + dispersion_error_rel * pars['dx'] * pars['dpp'] + alignment_error_m
+        x, y = b.x.mean(), b.y.mean() 
+        outi['scr_x_up'] = x + outi['scr_x']
+        outi['scr_x_low'] = x - outi['scr_x']
+        outi['scr_y_up'] = y + outi['scr_y']
+        outi['scr_y_low'] = y - outi['scr_y']
+        out.append(pd.DataFrame(outi, index=[loc]))
+    return pd.concat(out, axis=0)
 
 def remove_dispersion(beam):
     beam = copy(beam)
@@ -89,9 +103,9 @@ def get_initial_condition(beam):
 def calc_envelope(beam, groupby='index'):
     if groupby == 'index':
         beam.index.names = ['idx']
-        gb = beam.groupby('idx')
+        gb = beam.groupby('idx', sort=False)
     else:
-        gb = beam.groupby(groupby)
+        gb = beam.groupby(groupby, sort=False)
 
     env = {}
     env['s'] = gb.s.mean()
@@ -113,4 +127,15 @@ def calc_envelope(beam, groupby='index'):
     env['medy'] = gb.y.median()
     env['meanx'] = gb.x.mean()
     env['meany'] = gb.y.mean()
-    return pd.DataFrame(env).sort_values('s')
+    return pd.DataFrame(env)#.sort_values('s')
+
+def split_beam(beam, splitting_ratio=0.5, recenter=True):
+    beam.sort_values('y', ascending=False, inplace=True)
+    upper = beam.iloc[:int(len(beam.index)*splitting_ratio)]
+    lower = beam.iloc[int(len(beam.index)*splitting_ratio):]
+    if recenter:
+        upper.y -= upper.y.mean()
+        lower.y -= lower.y.mean()
+        upper.py -= upper.py.mean()
+        lower.py -= lower.py.mean()
+    return upper, lower
