@@ -4,6 +4,7 @@ from bokeh.models import HoverTool
 from copy import copy
 from collections.abc import Iterable
 import numpy as np
+import madutils as mu
 
 import warnings
 from pandas.errors import SettingWithCopyWarning
@@ -75,6 +76,7 @@ def plot_lattice(
         marker_width = 0.3, marker_height = 0.4,
         twiss_plots=None,
         offsets=None,
+        filter_elements=None,
         **kwargs):
     
     if range_:
@@ -84,6 +86,8 @@ def plot_lattice(
     else:
         twiss = copy(twiss)
     
+    if filter_elements:
+        twiss = twiss.filter(**filter_elements)
     twiss['color'] = [colors[kwrd] if kwrd in colors.keys() else None for kwrd in twiss.keyword]
     to_draw = twiss[(twiss['color'] >= '') & (twiss['aper_1'] > 0)]
     vdims = [to_draw[item] for item in vdims_names]
@@ -152,7 +156,7 @@ def plot_lattice(
 
 SYNOPTIC_ELEM_HIGHT = 1
 SYNOPTIC_YLIM = (-SYNOPTIC_ELEM_HIGHT * 1.2, SYNOPTIC_ELEM_HIGHT * 3)
-SYNOPTIC_MARKER_WIDTH = 0.3
+SYNOPTIC_MARKER_WIDTH = 0.1
 SYNOPTIC_HOVER_NAMES = ['color', 'keyword', 'name', 's', 'apertype', 'aper_1', 'aper_2', 'l', 'tilt', 'angle', 'k1l']
 SYNOPTIC_TOOLTIPS = [(item, '@' + item) for item in SYNOPTIC_HOVER_NAMES[1:]]
 SYNOPTIC_STYLE = dict(
@@ -300,6 +304,35 @@ def plot_envelope(env, range_=None, area_core_style=area_core_style, area_wings_
     envelope = (area_x * envelope_x + area_y * envelope_y).opts(curve_opts).cols(1)
     return envelope
 
+################## SCR ##################
+scr_area_style = dict(
+    color = 'red',
+    alpha = 0.3
+)
+scr_contour_style = dict(
+    color = 'red',
+    line_width = 0.5,
+    tools=['hover']
+)
+def plot_scr(scr_data, range_=None, **kwargs):
+    if range_:
+        range_ = range_.split('/')
+        scr_data = copy(scr_data.loc[range_[0]:range_[1]])
+        scr_data.s -= scr_data.loc[range_[0]].s
+    
+    scrx_fill = hv.Area(scr_data, s_dim, vdims=['scr_x_low', 'scr_x_up'], label='SCR')
+    scry_fill = hv.Area(scr_data, s_dim, vdims=['scr_y_low', 'scr_y_up'], label='SCR')
+    scrx = hv.Curve(scr_data, s_dim, 'scr_x_up') * hv.Curve(scr_data, s_dim, 'scr_x_low')
+    scry = hv.Curve(scr_data, s_dim, 'scr_y_up') * hv.Curve(scr_data, s_dim, 'scr_y_low')
+
+    area_opts = opts.Area(**scr_area_style)
+    contour_opts = opts.Curve(**scr_contour_style)
+    layout_x = (scrx_fill * scrx).opts(xlabel='s (m)', ylabel='x (m)')
+    layout_y = (scry_fill * scry).opts(xlabel='s (m)', ylabel='y (m)')
+    scr = (layout_x + layout_y).opts(contour_opts).opts(area_opts).cols(1)
+    return scr
+
+
 
 ################## Twiss ##################
 default_twiss_keys = ['betx', 'bety', 'alfx', 'alfy', 'mux', 'muy']
@@ -353,7 +386,7 @@ def plot_twiss(twiss, kind='beta', range_=None, **kwargs):
     return layout.opts(**kwargs).cols(1)
 
 ################## All ##################
-def plot_all(twiss, env, range_=None, twiss_plots=None, offsets=None, synoptic=False, **kwargs):
+def plot_all(twiss, env, range_=None, twiss_plots=None, offsets=None, synoptic=False, show_scr=None, **kwargs):
     if range_:
         range_env=range_.split('/')
         s1 = twiss.loc[range_env[0]].s
@@ -366,15 +399,20 @@ def plot_all(twiss, env, range_=None, twiss_plots=None, offsets=None, synoptic=F
     x_opts = dict(xlabel='s (m)', ylabel='x (m)')
     y_opts = dict(xlabel='s (m)', ylabel='y (m)')
 
+    if show_scr:
+        scr = plot_scr(env, range_=range_)
+        layout =\
+            (scr[0] * lattice[0] * envelope[0]).opts(**x_opts) +\
+            (scr[1] * lattice[1] * envelope[1]).opts(**y_opts)
+    else:
+        layout =\
+            (lattice[0] * envelope[0]).opts(**x_opts) +\
+            (lattice[1] * envelope[1]).opts(**y_opts)
+
     if synoptic:
         synoptic_kwargs = {} if not isinstance(synoptic, dict) else synoptic
         synoptic = plot_synoptic(twiss, range_=range_, **synoptic_kwargs)
-        layout =\
-        synoptic +\
-        (lattice[0] * envelope[0]).opts(**x_opts) + (lattice[1] * envelope[1]).opts(**y_opts)
-    else:
-        layout=\
-        (lattice[0] * envelope[0]).opts(**x_opts) + (lattice[1] * envelope[1]).opts(**y_opts)
+        layout = synoptic + layout
 
     for i in range(len(lattice)): # Add twiss plots to the layout
         if i > 1:
@@ -386,24 +424,37 @@ def plot_beam_within_aperture(
         particles, 
         twiss, 
         loc, 
-        options=dict(width=400, height=400, tools=['hover'], size=0.5), 
-        frame_scale = 1.1):
+        options=dict(width=400, height=400, tools=['hover']),
+        xlim=(-0.1, 0.1),
+        ylim=(-0.1, 0.1)):
     beam = particles.loc[loc]
     aper_1 = twiss.loc[loc].aper_1
     aper_2 = twiss.loc[loc].aper_2
     apertype = twiss.loc[loc].apertype
     if apertype == 'circle':
-        aperture = hv.Ellipse(0, 0, aper_1*2, label=loc + 'aperture')
+        aperture = hv.Ellipse(0, 0, aper_1*2).opts(line_color='black', color=None)
         aper_2 = aper_1
     elif apertype == 'ellipse':
-        aperture = hv.Ellipse(0, 0, (aper_1*2, aper_2*2), label=loc + 'aperture')
+        aperture = hv.Ellipse(0, 0, (aper_1*2, aper_2*2)).opts(line_color='black', color=None)
+    elif apertype == 'rectangle':
+        aperture = hv.Rectangles((-aper_1, -aper_2, aper_1, aper_2)).opts(line_color='black', color=None)
     else:
         raise ValueError('apertype not supported')
-    beam_and_aperture = hv.Scatter(beam, 'x', 'y', label='beam').opts(**options) * aperture
+    beam_distribution = hv.Scatter(beam, 'x', 'y', label='beam').opts(size=0.5, **options)
+    beam_envelope = hv.Ellipse(beam.x.mean(), beam.y.mean(), (2*3*beam.x.std(), 2*3*beam.y.std()), label='beam envelope (3 sigma)')
+    scr_data = mu.calculate_scr(beam, betx_max=twiss.loc[loc].betx, bety_max=twiss.loc[loc].bety)
+    scr = hv.Rectangles((scr_data['scr_x_low'], scr_data['scr_y_low'], scr_data['scr_x_up'], scr_data['scr_y_up']), label='SCR').opts(color='red', alpha=0.3)
+    beam_and_aperture =\
+    aperture.opts(**options) *\
+    scr *\
+    beam_envelope.opts(color='blue', line_color='blue', alpha=0.5) *\
+    beam_distribution
+
     beam_and_aperture = beam_and_aperture.opts(
-        xlim=(-aper_1*frame_scale, aper_2*frame_scale),
-        ylim=(-aper_1*frame_scale, aper_2*frame_scale), 
+        xlim=xlim,
+        ylim=ylim, 
         fontsize=fontsize,
         xlabel='x (m)', 
         ylabel='y (m)')
+    
     return beam_and_aperture

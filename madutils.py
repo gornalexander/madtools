@@ -51,7 +51,7 @@ def calc_beam_pars(beam, energy_GeV=400, mass_GeV=proton_mass_GeV):
 
 def calculate_scr(beam, betx_max, bety_max, sigma_factor=7, orbit_error_m=5e-3, size_error_rel=0.1, dispersion_error_rel=0.1, alignment_error_m=1e-3):
     out = []
-    for loc, b in beam.groupby('idx'):
+    for loc, b in beam.groupby('idx', sort=False):
         outi = {}
         pars = calc_beam_pars(b)
         outi['scr_x'] = pars['sigx'] * (sigma_factor + size_error_rel) + orbit_error_m * np.sqrt(pars['betx']/betx_max) + dispersion_error_rel * pars['dx'] * pars['dpp'] + alignment_error_m
@@ -139,3 +139,9 @@ def split_beam(beam, splitting_ratio=0.5, recenter=True):
         upper.py -= upper.py.mean()
         lower.py -= lower.py.mean()
     return upper, lower
+
+def set_strength_error(madx, name, dkn=[]):
+    madx.select(flag='error', clear=True)
+    madx.select(flag='error', pattern=name)
+    madx.input('EOPTION, ADD=False')
+    madx.command.efcomp(dkn=dkn)
