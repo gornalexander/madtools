@@ -13,41 +13,63 @@ def calc_corr_factor(x, y):
     return k
 
 
-def calc_beam_pars(beam, energy_GeV=400, mass_GeV=proton_mass_GeV):
+def calc_beam_pars(beam, energy_GeV=400, mass_GeV=proton_mass_GeV, correct_d=True):
+    beam = copy(beam)
     pars = {}
     try:
         gamma = beam.e.mean() / mass_GeV
     except AttributeError:
         gamma = energy_GeV / mass_GeV
-    covxpx = np.cov(beam.x, beam.px)
-    covypy = np.cov(beam.y, beam.py)
     pars['rel_gamma'] = gamma
     if 's' in beam.columns:
         pars['s'] = beam.s.mean()
-    pars['sigx'] = np.sqrt(covxpx[0,0])
-    pars['sigy'] = np.sqrt(covypy[0,0])
-    pars['sigpx'] = np.sqrt(covxpx[1,1])
-    pars['sigpy'] = np.sqrt(covypy[1,1])
-    pars['dpp'] = np.sqrt((beam.pt**2).mean())
-    pars['geom_emitt_x'] = np.linalg.det(covxpx)**0.5
-    pars['geom_emitt_y'] = np.linalg.det(covypy)**0.5
-    pars['emitt_norm_x'] = pars['geom_emitt_x'] * gamma
-    pars['emitt_norm_y'] = pars['geom_emitt_y']  * gamma
-    pars['betx'] = pars['sigx']**2 / pars['geom_emitt_x']
-    pars['bety'] = pars['sigy']**2 / pars['geom_emitt_y']
-    pars['alfx'] = - (beam.x*beam.px).mean() / pars['geom_emitt_x']
-    pars['alfy'] = - (beam.y*beam.py).mean() / pars['geom_emitt_y']
-    pars['gamx'] = pars['sigpx']**2 / pars['geom_emitt_x']
-    pars['gamy'] = pars['sigpy']**2 / pars['geom_emitt_y']
+
+    pars['sigx'] = beam.x.std()
+    pars['sigy'] = beam.y.std()
+    pars['sigpx'] = beam.px.std()
+    pars['sigpy'] = beam.py.std()
+    pars['dpp'] = beam.pt.std()
+
     pars['dx'] = calc_corr_factor(beam.pt, beam.x)
     pars['dy'] = calc_corr_factor(beam.pt, beam.y)
     pars['dpx'] = calc_corr_factor(beam.pt, beam.px)
     pars['dpy'] = calc_corr_factor(beam.pt, beam.py)
-    # pars['beta_geom_emitt_x'] = np.linalg.det(np.cov(beam.x - pars['dx'] * beam.pt, beam.px - pars['dpx'] * beam.pt))
-    # pars['beta_geom_emitt_y'] = np.linalg.det(np.cov(beam.y - pars['dy'] * beam.pt, beam.py - pars['dpy'] * beam.pt))
-    # pars['beta_emitt_norm_x'] = pars['beta_geom_emitt_x'] * gamma
-    # pars['beta_emitt_norm_y'] = pars['beta_geom_emitt_y'] * gamma
+    
+    
+    if correct_d:
+        beam.x -= pars['dx'] * beam.pt
+        beam.y -= pars['dy'] * beam.pt
+        beam.px -= pars['dpx'] * beam.pt
+        beam.py -= pars['dpy'] * beam.pt
+    
+    beam.x -= beam.x.mean()
+    beam.y -= beam.y.mean()
+    beam.px -= beam.px.mean()
+    beam.py -= beam.py.mean()
+    beam.pt -= beam.pt.mean()
+
+    
+    covxpx = np.cov(beam.x, beam.px)
+    covypy = np.cov(beam.y, beam.py)
+    
+    pars['geom_emitt_x'] = np.linalg.det(covxpx)**0.5
+    pars['geom_emitt_y'] = np.linalg.det(covypy)**0.5
+    pars['emitt_norm_x'] = pars['geom_emitt_x'] * gamma
+    pars['emitt_norm_y'] = pars['geom_emitt_y'] * gamma
+    pars['betx'] = beam.x.std()**2 / pars['geom_emitt_x']
+    pars['bety'] = beam.y.std()**2 / pars['geom_emitt_y']
+    pars['alfx'] = - covxpx[0, 1] / pars['geom_emitt_x']
+    pars['alfy'] = - covypy[0, 1] / pars['geom_emitt_y']
+    pars['gamx'] = beam.px.std()**2 / pars['geom_emitt_x']
+    pars['gamy'] = beam.py.std()**2 / pars['geom_emitt_y']
+    
     return pars
+
+def calc_beam_pars_df(beam, energy_GeV=400, mass_GeV=proton_mass_GeV, correct_d=True):
+    pars=[]
+    for loc in beam.index.drop_duplicates():
+        pars.append(calc_beam_pars(beam.loc[loc], energy_GeV, mass_GeV, correct_d))
+    return pd.DataFrame(pars, index=beam.index.drop_duplicates())
 
 def calculate_scr(beam, betx_max, bety_max, sigma_factor=7, orbit_error_m=5e-3, size_error_rel=0.1, dispersion_error_rel=0.1, alignment_error_m=1e-3):
     out = []
@@ -64,13 +86,33 @@ def calculate_scr(beam, betx_max, bety_max, sigma_factor=7, orbit_error_m=5e-3, 
         out.append(pd.DataFrame(outi, index=[loc]))
     return pd.concat(out, axis=0)
 
-def remove_dispersion(beam):
+def remove_dispersion(beam, dx=None, dpx=None, dy=None, dpy=None):
     beam = copy(beam)
-    beam.x -= calc_corr_factor(beam.pt, beam.x) * beam.pt
-    beam.y -= calc_corr_factor(beam.pt, beam.y) * beam.pt
-    beam.px -= calc_corr_factor(beam.pt, beam.px) * beam.pt
-    beam.py -= calc_corr_factor(beam.pt, beam.py) * beam.pt
+    if dx is None:
+        beam.x -= calc_corr_factor(beam.pt, beam.x) * beam.pt
+    else:
+        beam.x -= dx * beam.pt
+    
+    if dy is None:
+        beam.y -= calc_corr_factor(beam.pt, beam.y) * beam.pt
+    else:
+        beam.y -= dy * beam.pt
+    
+    if dpx is None:
+        beam.px -= calc_corr_factor(beam.pt, beam.px) * beam.pt
+    else:
+        beam.px -= dpx * beam.pt
+    
+    if dpy is None:
+        beam.py -= calc_corr_factor(beam.pt, beam.py) * beam.pt
+    else:
+        beam.py -= dpy * beam.pt
+    
     return beam
+
+def remove_twiss_dispersion(beam, twiss, loc):
+    tw = twiss.loc[loc]
+    return remove_dispersion(beam, tw.dx, tw.dpx, tw.dy, tw.dpy)
 
 
 def get_twiss_from_distribution(particles, rm_dispersion=False):

@@ -68,6 +68,10 @@ default_style = dict(
     fontsize=fontsize
 )
 
+def tilt_apertures(aper_1, aper_2, tilt):
+    ellipce_radius = lambda a, b, phi: (a*b) / np.sqrt((b*np.cos(phi))**2 + (a*np.sin(phi))**2)
+    return ellipce_radius(aper_1, aper_2, tilt), ellipce_radius(aper_1, aper_2, tilt + np.pi/2)
+
 def plot_lattice(
         twiss,
         range_=None,
@@ -93,7 +97,8 @@ def plot_lattice(
     vdims = [to_draw[item] for item in vdims_names]
     # Apertures
     to_draw.loc[to_draw['apertype'] == 'circle', 'aper_2'] = to_draw[to_draw['apertype'] == 'circle']['aper_1'] # add vertical apertures for circle apertype
-
+    to_draw['aper_1'], to_draw['aper_2'] = tilt_apertures(to_draw['aper_1'], to_draw['aper_2'], to_draw['tilt'])
+    
     to_draw['right'] = to_draw['s']
     to_draw['s'] = to_draw['s'] - to_draw['l']
     to_draw['xtopto'] = to_draw['aper_1'] + elem_height
