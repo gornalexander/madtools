@@ -3,9 +3,35 @@ import numpy as np
 import pandas as pd
 from scipy.constants import proton_mass, c, e
 
+units = {
+    'm': 1,
+    'mm': 1e-3,
+    'um': 1e-6,
+    'nm': 1e-9,
+    'rad': 1,
+    'mrad': 1e-3,
+    'urad': 1e-6,
+    'nrad': 1e-9,
+}
 
 proton_mass_GeV = proton_mass * c**2 / e * 1e-9
 
+def get_z_score(values):
+    return abs(values - values.mean()) / values.std()
+
+def calc_z_score(beam, inplace=False):
+    z_score = beam.copy().select_dtypes(include=float).apply(get_z_score).max(axis=1)
+    if inplace:
+        beam['z_score'] = z_score
+    return z_score
+
+def filter_outliners(beam, max_z_score=100, inplace=False):
+    z_score = calc_z_score(beam, inplace=inplace)
+    if inplace:
+        b = beam.query('z_score <= @max_z_score', inplace=inplace)
+    else:
+        b = beam[z_score <= max_z_score]
+    return b
 
 def calc_corr_factor(x, y):
     cov = np.cov(x, y)
@@ -16,11 +42,11 @@ def calc_corr_factor(x, y):
 def calc_beam_pars(beam, energy_GeV=400, mass_GeV=proton_mass_GeV, correct_d=True):
     beam = copy(beam)
     pars = {}
-    try:
-        gamma = beam.e.mean() / mass_GeV
-    except AttributeError:
-        gamma = energy_GeV / mass_GeV
-    pars['rel_gamma'] = gamma
+    # try:
+    #     gamma = beam.e.mean() / mass_GeV
+    # except AttributeError:
+    #     gamma = energy_GeV / mass_GeV
+    pars['rel_gamma'] = energy_GeV / mass_GeV
     if 's' in beam.columns:
         pars['s'] = beam.s.mean()
 
@@ -187,3 +213,30 @@ def set_strength_error(madx, name, dkn=[]):
     madx.select(flag='error', pattern=name)
     madx.input('EOPTION, ADD=False')
     madx.command.efcomp(dkn=dkn)
+
+
+def normalize_coordinates(beam, pars=None, inplace=False):
+    if not inplace:
+        beam = copy(beam)
+    if pars is None:
+        pars = calc_beam_pars(beam)
+    
+    betx = pars['betx']
+    bety = pars['bety']
+    beam.x /= betx**0.5
+    beam.y /= bety**0.5
+    beam.px *= betx**0.5
+    beam.py *= bety**0.5
+    
+    return beam
+
+
+def to_human_units(beam, l_unit='mm', p_unit='mrad', pt_unit=1e-3):
+    beam = copy(beam)
+    beam.x /= units[l_unit] if type(l_unit) == str else l_unit
+    beam.y /= units[l_unit] if type(l_unit) == str else l_unit
+    beam.px /= units[p_unit] if type(p_unit) == str else p_unit
+    beam.py /= units[p_unit] if type(p_unit) == str else p_unit
+    beam.pt /= units[pt_unit] if type(pt_unit) == str else pt_unit
+    return beam
+

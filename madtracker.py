@@ -16,7 +16,7 @@ def track_line_ptc(
         onetable=True,
         recloss=True,
         norm_no=4,
-        **kwargs,
+        **kwargs
     ):
         parts_in = particles_in.copy()
         true_idx = np.array(parts_in.number)
@@ -33,7 +33,7 @@ def track_line_ptc(
                     px=part.px,
                     y=part.y,
                     py=part.py,
-                    t=0.0,
+                    t=part.t,
                     pt=part.pt,
                 )
 
@@ -77,6 +77,7 @@ def transfer_beam(
         observe='all',
         sequence=None, 
         range_=None,
+        **kwargs
         ):
     if sequence:
         madx.use(sequence=sequence, range_=range_)
@@ -84,7 +85,7 @@ def transfer_beam(
     
     if n_particles:
         particles_distribution = particles_distribution.sample(min(n_particles, len(particles_distribution.index)))
-    particles_distribution["number"] = particles_distribution.index
+    #particles_distribution["number"] = particles_distribution.index
 
     if observe == 'all':
         observe = list(twiss.index)
@@ -94,6 +95,7 @@ def transfer_beam(
     particles, losses = track_line_ptc(
         madx=madx,
         particles_in=particles_distribution,
-        observe=observe
+        observe=observe,
+        **kwargs
     )
     return particles, twiss
