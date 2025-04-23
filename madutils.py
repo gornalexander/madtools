@@ -46,7 +46,8 @@ def calc_beam_pars(beam, energy_GeV=400, mass_GeV=proton_mass_GeV, correct_d=Tru
     #     gamma = beam.e.mean() / mass_GeV
     # except AttributeError:
     #     gamma = energy_GeV / mass_GeV
-    pars['rel_gamma'] = energy_GeV / mass_GeV
+    gamma = energy_GeV / mass_GeV
+    pars['rel_gamma'] = gamma
     if 's' in beam.columns:
         pars['s'] = beam.s.mean()
 
