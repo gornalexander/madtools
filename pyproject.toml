@@ -25,6 +25,7 @@ dependencies = [
   "bokeh",
   "cpymad>=1.14.0",
   "holoviews",
+  "ipywidgets",
   "pandas",
   "numpy",
   "matplotlib",
