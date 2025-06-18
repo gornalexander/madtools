@@ -8,6 +8,7 @@ __pycache__
 *.py[co]
 *.egg-info
 *.pkg-info
+*.DS_Store
 
 # Common virtual env names
 venv/
