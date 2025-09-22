@@ -316,6 +316,7 @@ def upsample_beam(
             new_beam[k].hist(bins=nbins, alpha=0.5, density=True, label='Upsampled');
             plt.xlabel(k)
             plt.legend()
+        plt.tight_layout()
         plt.show()
     ##########################
 
