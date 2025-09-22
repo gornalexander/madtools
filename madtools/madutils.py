@@ -2,6 +2,8 @@ from copy import copy
 import numpy as np
 import pandas as pd
 from scipy.constants import proton_mass, c, e
+from sklearn.neighbors import KernelDensity
+import matplotlib.pyplot as plt
 
 units = {
     'm': 1,
@@ -241,3 +243,86 @@ def to_human_units(beam, l_unit='mm', p_unit='mrad', pt_unit=1e-3):
     beam.pt /= units[pt_unit] if type(pt_unit) == str else pt_unit
     return beam
 
+def upsample_beam(
+        beam,
+        kernel_settings = dict(
+                        # kernel = 'tophat',
+                        # bandwidth = 0.00008,
+                        kernel = 'gaussian',
+                        bandwidth = 0.00003, # Important parameter for resampling
+                        metric='minkowski'),
+        normalization = dict(
+                            x=1/5,
+                            px=5,
+                            y=1/2,
+                            py=5,
+                            pt=1/3,
+                            t=1/c/500),
+        num_samples = int(1e6),
+        plot=True,
+        nbins = 1000,
+        nbins2d = 200,
+):
+    cols = normalization.keys()
+    beam_selected = beam[cols].copy()
+
+    for k in cols:
+        beam_selected[k] *= normalization[k]
+    
+    kde = KernelDensity(**kernel_settings).fit(beam_selected)
+    new_beam = kde.sample(num_samples)
+    new_beam = pd.DataFrame(new_beam, columns=cols)
+
+    for k in cols:
+        new_beam[k] /= normalization[k]
+    
+    ######## Plotting ########
+    if plot:
+        lims = {k: (beam.selected[k].min(), beam_selected[k].max()) for k in cols}
+
+        plt.figure(figsize=(8, 10))
+
+        hists2d = [['x', 'px'], ['y', 'py'], ['x', 'pt'], ['y', 'pt'], ['t', 'pt']]
+
+        for x, y in hists2d:
+            if x not in cols or y not in cols:
+                continue
+            plt.subplot(5, 2, hists2d.index([x, y])*2+1)
+            plt.title('Original beam')
+            plt.hist2d(beam_selected[x], beam_selected[y], bins=nbins2d, cmap='viridis');
+            plt.xlim(*lims[x])
+            plt.ylim(*lims[y])
+            plt.xlabel(x)
+            plt.ylabel(y)
+            plt.subplot(5, 2, hists2d.index([x, y])*2+2)
+            plt.title('Upsampled beam')
+            plt.hist2d(new_beam[x], new_beam[y], bins=nbins2d, cmap='viridis');
+            plt.xlim(*lims[x])
+            plt.ylim(*lims[y])
+            plt.xlabel(x)
+            plt.ylabel(y)   
+        plt.tight_layout()
+        plt.show()
+
+        ##########################
+
+        plt.figure(figsize=(12, 12))
+        hists = cols
+        for k in hists:
+            plt.subplot(3, 2, hists.index(k)+1)
+            plt.title(f'Histogram of {k}')
+            beam_selected[k].hist(bins=nbins, alpha=0.5, density=True, label='Original');
+            new_beam[k].hist(bins=nbins, alpha=0.5, density=True, label='Upsampled');
+            plt.xlabel(k)
+            plt.legend()
+        plt.show()
+    ##########################
+    
+    new_beam['elements'] = beam.index.drop_duplicates()[0]
+    new_beam['number'] = new_beam.index
+    new_beam.index = new_beam['elements'].values
+    new_beam['turn'] = beam['turn'].iloc[0]
+    # new_beam['t'] = beam['t'].iloc[0]
+    new_beam['s'] = beam['s'].iloc[0]
+    new_beam['e'] = beam['e'].iloc[0]
+    return new_beam
