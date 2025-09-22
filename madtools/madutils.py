@@ -263,7 +263,7 @@ def upsample_beam(
         nbins = 1000,
         nbins2d = 200,
 ):
-    cols = normalization.keys()
+    cols = list(normalization.keys())
     beam_selected = beam[cols].copy()
 
     for k in cols:
@@ -275,10 +275,11 @@ def upsample_beam(
 
     for k in cols:
         new_beam[k] /= normalization[k]
+        beam_selected[k] /= normalization[k]
     
     ######## Plotting ########
     if plot:
-        lims = {k: (beam.selected[k].min(), beam_selected[k].max()) for k in cols}
+        lims = {k: (beam_selected[k].min(), beam_selected[k].max()) for k in cols}
 
         plt.figure(figsize=(8, 10))
 
@@ -317,7 +318,7 @@ def upsample_beam(
             plt.legend()
         plt.show()
     ##########################
-    
+
     new_beam['elements'] = beam.index.drop_duplicates()[0]
     new_beam['number'] = new_beam.index
     new_beam.index = new_beam['elements'].values
