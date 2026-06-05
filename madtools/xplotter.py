@@ -7,8 +7,11 @@ from collections.abc import Iterable
 import numpy as np
 
 import warnings
-from pandas.errors import SettingWithCopyWarning
-warnings.simplefilter(action='ignore', category=(SettingWithCopyWarning))
+try:
+    from pandas.errors import SettingWithCopyWarning
+    warnings.simplefilter(action='ignore', category=(SettingWithCopyWarning))
+except ImportError:
+    pass  # Removed in pandas 3.0
 
 from xtrack.beam_elements import apertures as ap
 
