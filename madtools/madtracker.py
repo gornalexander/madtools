@@ -108,6 +108,7 @@ def transfer_beam(
         observe='all',
         sequence=None, 
         range_=None,
+        return_lost=False,
         **kwargs
         ):
     if sequence:
@@ -129,4 +130,7 @@ def transfer_beam(
         observe=observe,
         **kwargs
     )
-    return particles, twiss
+    if return_lost:
+        return (particles, losses), twiss
+    else:
+        return particles, twiss

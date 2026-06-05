@@ -6,8 +6,7 @@ from collections.abc import Iterable
 import numpy as np
 from . import madutils as mu
 import warnings
-from pandas.errors import SettingWithCopyWarning
-warnings.simplefilter(action='ignore', category=(SettingWithCopyWarning))
+warnings.filterwarnings("ignore", category=UserWarning)
 
 ################## Lattice ##################
 colors = {
@@ -96,10 +95,10 @@ def plot_lattice(
     vdims = [to_draw[item] for item in vdims_names]
     # Apertures
     to_draw.loc[to_draw['apertype'] == 'circle', 'aper_2'] = to_draw[to_draw['apertype'] == 'circle']['aper_1'] # add vertical apertures for circle apertype
-    to_draw['aper_1'], to_draw['aper_2'] = tilt_apertures(to_draw['aper_1'], to_draw['aper_2'], to_draw['tilt'])
+    # to_draw['aper_1'], to_draw['aper_2'] = tilt_apertures(to_draw['aper_1'], to_draw['aper_2'], to_draw['tilt']) # Tilt is not used anymore
     
     to_draw['right'] = to_draw['s']
-    to_draw['s'] = to_draw['s'] - to_draw['l']
+    to_draw['s'] = to_draw['s'] - np.max([to_draw['l'], np.ones_like(to_draw['l']) * marker_width], axis=0)
     to_draw['xtopto'] = to_draw['aper_1'] + elem_height
     to_draw['xtopfrom'] = to_draw['aper_1']
     to_draw['xbotto'] = -to_draw['aper_1']
@@ -115,9 +114,15 @@ def plot_lattice(
             if key not in to_draw.index:
                 continue
             to_draw.loc[key, 'xtopfrom'] += offsets[key][0]
+            to_draw.loc[key, 'xtopto'] += offsets[key][0]
+            to_draw.loc[key, 'xbotfrom'] += offsets[key][0]
             to_draw.loc[key, 'xbotto'] += offsets[key][0]
+
             to_draw.loc[key, 'ytopfrom'] += offsets[key][1]
+            to_draw.loc[key, 'ytopto'] += offsets[key][1]
             to_draw.loc[key, 'ybotto'] += offsets[key][1]
+            to_draw.loc[key, 'ybotfrom'] += offsets[key][1]
+            
             to_draw.loc[key, 'right'] += offsets[key][2]
             to_draw.loc[key, 's'] += offsets[key][2]
     
@@ -268,7 +273,11 @@ curve_style = dict(
     tools = ['hover']
 )
 
-def plot_envelope(env, range_=None, area_core_style=area_core_style, area_wings_style=area_wings_style, curve_style=curve_style):
+def plot_envelope(env, range_=None,
+                  area_sigma_style=area_sigma_style,
+                  area_core_style=area_core_style, 
+                  area_wings_style=area_wings_style, 
+                  curve_style=curve_style):
     if range_:
         cond = (env.s >= range_[0]) & (env.s <= range_[1])
         env = copy(env[cond])
@@ -390,7 +399,7 @@ def plot_twiss(twiss, kind='beta', range_=None, **kwargs):
     return layout.opts(**kwargs).cols(1)
 
 ################## All ##################
-def plot_all(twiss, env, range_=None, twiss_plots=None, offsets=None, synoptic=False, show_scr=None, **kwargs):
+def plot_all(twiss, env, range_=None, twiss_plots=None, offsets=None, synoptic=False, show_scr=None, env_kwargs={}, **kwargs):
     if range_:
         range_env=range_.split('/')
         s1 = twiss.loc[range_env[0]].s
@@ -399,7 +408,7 @@ def plot_all(twiss, env, range_=None, twiss_plots=None, offsets=None, synoptic=F
     else:
         range_env = None
     lattice = plot_lattice(twiss, range_=range_, twiss_plots=twiss_plots, offsets=offsets, **kwargs)
-    envelope = plot_envelope(env, range_=range_env)
+    envelope = plot_envelope(env, range_=range_env, **env_kwargs)
     x_opts = dict(xlabel='s (m)', ylabel='x (m)')
     y_opts = dict(xlabel='s (m)', ylabel='y (m)')
 

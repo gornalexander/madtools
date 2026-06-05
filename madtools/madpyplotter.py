@@ -104,7 +104,7 @@ def plot_beam_info(
     ax[1, 1].set_xlabel(r'$\delta_p \,/ \,10^{-3}$')
 
     ax[1, 0].set_title('Longitudinal distribution')
-    _, _, bars = ax[1, 0].hist(beam['t'] * 1e3, bins=bins)
+    _, _, bars = ax[1, 0].hist(beam['t'], bins=bins)
     for i, (value, bar) in enumerate(zip(values, bars)):
         bar.set_facecolor(cmap((value - values.min())/(values.max() - values.min())))
     ax[1, 0].set_xlabel('ct [m]')
@@ -159,8 +159,6 @@ def plot_beam_info(
     
     if show:
         plt.show()
-    else:
-        plt.close()
 
 def show_beam_images(
     png_dir,

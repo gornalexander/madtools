@@ -303,7 +303,7 @@ def upsample_beam(
             plt.xlabel(x)
             plt.ylabel(y)   
         plt.tight_layout()
-        plt.show()
+        #plt.show()
 
         ##########################
 
@@ -317,7 +317,7 @@ def upsample_beam(
             plt.xlabel(k)
             plt.legend()
         plt.tight_layout()
-        plt.show()
+        #plt.show()
     ##########################
 
     new_beam['elements'] = beam.index.drop_duplicates()[0]
