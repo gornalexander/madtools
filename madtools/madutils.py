@@ -2,7 +2,6 @@ from copy import copy
 import numpy as np
 import pandas as pd
 from scipy.constants import proton_mass, c, e
-from sklearn.neighbors import KernelDensity
 import matplotlib.pyplot as plt
 
 units = {
@@ -269,6 +268,7 @@ def upsample_beam(
     for k in cols:
         beam_selected[k] *= normalization[k]
     
+    from sklearn.neighbors import KernelDensity
     kde = KernelDensity(**kernel_settings).fit(beam_selected)
     new_beam = kde.sample(num_samples)
     new_beam = pd.DataFrame(new_beam, columns=cols)
