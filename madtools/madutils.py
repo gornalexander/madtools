@@ -201,8 +201,8 @@ def calc_envelope(beam, groupby='index'):
 
 def split_beam(beam, splitting_ratio=0.5, recenter=True):
     beam.sort_values('y', ascending=False, inplace=True)
-    upper = beam.iloc[:int(len(beam.index)*splitting_ratio)]
-    lower = beam.iloc[int(len(beam.index)*splitting_ratio):]
+    upper = beam.iloc[:int(len(beam.index)*splitting_ratio)].copy()
+    lower = beam.iloc[int(len(beam.index)*splitting_ratio):].copy()
     if recenter:
         upper.y -= upper.y.mean()
         lower.y -= lower.y.mean()
