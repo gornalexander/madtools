@@ -91,7 +91,7 @@ def plot_lattice(
     if filter_elements:
         twiss = twiss.filter(**filter_elements)
     twiss['color'] = [colors[kwrd] if kwrd in colors.keys() else None for kwrd in twiss.keyword]
-    to_draw = twiss[(twiss['color'] >= '') & (twiss['aper_1'] > 0)]
+    to_draw = twiss[(twiss['color'] >= '') & (twiss['aper_1'] > 0)].copy()
     vdims = [to_draw[item] for item in vdims_names]
     # Apertures
     to_draw.loc[to_draw['apertype'] == 'circle', 'aper_2'] = to_draw[to_draw['apertype'] == 'circle']['aper_1'] # add vertical apertures for circle apertype
@@ -192,7 +192,7 @@ def plot_synoptic(twiss, range_=None,
         twiss = copy(twiss)
     
     twiss['color'] = [colors[kwrd] if kwrd in colors.keys() else None for kwrd in twiss.keyword]
-    to_draw = twiss[twiss['color'] >= '']
+    to_draw = twiss[twiss['color'] >= ''].copy()
     to_draw['color'] = [colors_tilted[el.keyword] if el.tilt != 0 else colors[el.keyword] for idx, el in to_draw.iterrows()]
 
     to_draw['right'] = to_draw['s']
